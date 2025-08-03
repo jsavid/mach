@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mach 3 estilo CGA 80s</title>
+<style>
+  /* Paleta CGA básica */
+  body, html {
+    margin: 0; padding: 0; overflow: hidden;
+    background: black;
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+    background: #000;
+    image-rendering: pixelated;
+    border: 4px solid #0ff; /* Cyan frame */
+  }
+  #pilotFace {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    border: 2px solid #fff; /* White */
+    background-color: black;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="640" height="480"></canvas>
+<div id="pilotFace"></div>
+
+<script>
+  // Paleta CGA (4 colores)
+  const COLORS = {
+    BLACK: '#000000',
+    CYAN: '#00FFFF',
+    MAGENTA: '#FF00FF',
+    WHITE: '#FFFFFF',
+  };
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const pilotFace = document.getElementById('pilotFace');
+
+  // Sprites pixel art simples (8x8 o 16x16)
+  // Para simplificar se dibujan con rects en CGA
+
+  // Estado del jugador
+  const player = {
+    x: canvas.width / 2,
+    y: canvas.height - 50,
+    width: 20,
+    height: 10,
+    speed: 6,
+  };
+
+  // Balas disparadas
+  const bullets = [];
+
+  // Enemigos (se acercan simulando 3D)
+  const enemies = [];
+  const MAX_ENEMIES = 6;
+
+  // Estado piloto (neutral, angry, hurt)
+  let pilotState = 'neutral';
+  let pilotStateTimeout = null;
+
+  // Control teclado
+  const keys = {
+    left: false,
+    right: false,
+    space: false,
+  };
+
+  // Imágenes pixel art para el rostro piloto (dibujamos directamente)
+  // Diferentes caras (16x16 pixels) en canvas para reutilizar
+  const pilotFaces = {};
+  function createPilotFaces() {
+    // Neutral
+    const c1 = document.createElement('canvas');
+    c1.width = 16; c1.height = 16;
+    const cx1 = c1.getContext('2d');
+    cx1.fillStyle = COLORS.CYAN;
+    cx1.fillRect(0,0,16,16);
+    cx1.fillStyle = COLORS.BLACK;
+    cx1.fillRect(4,4,2,2); // ojos
+    cx1.fillRect(10,4,2,2);
+    cx1.fillRect(6,11,4,1); // boca
+    pilotFaces.neutral = c1;
+
+    // Angry
+    const c2 = document.createElement('canvas');
+    c2.width = 16; c2.height = 16;
+    const cx2 = c2.getContext('2d');
+    cx2.fillStyle = COLORS.MAGENTA;
+    cx2.fillRect(0,0,16,16);
+    cx2.fillStyle = COLORS.BLACK;
+    // ojos enfadados
+    cx2.fillRect(3,4,3,2);
+    cx2.fillRect(10,4,3,2);
+    cx2.fillRect(6,12,4,1); // boca apretada
+    pilotFaces.angry = c2;
+
+    // Hurt
+    const c3 = document.createElement('canvas');
+    c3.width = 16; c3.height = 16;
+    const cx3 = c3.getContext('2d');
+    cx3.fillStyle = COLORS.MAGENTA;
+    cx3.fillRect(0,0,16,16);
+    cx3.fillStyle = COLORS.BLACK;
+    // ojo cerrado
+    cx3.fillRect(4,5,6,2);
+    cx3.fillRect(6,12,4,1); // boca triste
+    cx3.fillStyle = COLORS.WHITE;
+    cx3.fillRect(2,9,3,2); // "herida"
+    pilotFaces.hurt = c3;
+  }
+  createPilotFaces();
+
+  // Dibuja jugador (avión simple pixel art)
+  function drawPlayer() {
+    ctx.fillStyle = COLORS.CYAN;
+    ctx.fillRect(player.x - player.width/2, player.y - player.height/2, player.width, player.height);
+    // Alas
+    ctx.fillRect(player.x - player.width/2 - 4, player.y - 2, 4, 4);
+    ctx.fillRect(player.x + player.width/2, player.y - 2, 4, 4);
+  }
+
+  // Dibuja balas
+  function drawBullets() {
+    ctx.fillStyle = COLORS.MAGENTA;
+    for(let i=bullets.length-1; i>=0; i--) {
+      let b = bullets[i];
+      b.y -= 10;
+      if (b.y < 0) bullets.splice(i, 1);
+      else ctx.fillRect(b.x - 2, b.y, 4, 8);
+    }
+  }
+
+  // Crea enemigo con posición y escala para simular profundidad
+  function createEnemy() {
+    return {
+      x: Math.random() * canvas.width * 0.7 + canvas.width * 0.15,
+      y: -20,
+      speed: 1 + Math.random()*2,
+      scale: 0.3,
+      baseX: 0,
+    };
+  }
+
+  // Actualiza y dibuja enemigos con escala 3D simulada
+  function updateEnemies() {
+    ctx.fillStyle = COLORS.WHITE;
+    for(let i=enemies.length-1; i>=0; i--) {
+      let e = enemies[i];
+      e.y += e.speed;
+      e.scale += 0.005 * e.speed;
+      if (e.y > canvas.height + 50) {
+        enemies.splice(i,1);
+        continue;
+      }
+      // posición horizontal oscila para simular 3D movimiento
+      e.x += Math.sin(e.y * 0.05) * 1.5;
+
+      const w = 20 * e.scale;
+      const h = 10 * e.scale;
+      ctx.fillRect(e.x - w/2, e.y - h/2, w, h);
+      ctx.fillRect(e.x - w/2 - 3*e.scale, e.y - 2*e.scale, 3*e.scale, 5*e.scale);
+      ctx.fillRect(e.x + w/2, e.y - 2*e.scale, 3*e.scale, 5*e.scale);
+    }
+  }
+
+  // Detecta colisiones entre balas y enemigos
+  function checkCollisions() {
+    for(let i=enemies.length-1; i>=0; i--) {
+      let e = enemies[i];
+      for(let j=bullets.length-1; j>=0; j--) {
+        let b = bullets[j];
+        const w = 20 * e.scale;
+        const h = 10 * e.scale;
+        if (b.x > e.x - w/2 && b.x < e.x + w/2 && b.y > e.y - h/2 && b.y < e.y + h/2) {
+          // choque
+          enemies.splice(i,1);
+          bullets.splice(j,1);
+          pilotReact('angry');
+          return;
+        }
+      }
+    }
+  }
+
+  // Cambia expresión piloto
+  function pilotReact(state) {
+    pilotState = state;
+    if (pilotStateTimeout) clearTimeout(pilotStateTimeout);
+    pilotStateTimeout = setTimeout(() => {
+      pilotState = 'neutral';
+    }, 400);
+  }
+
+  // Dibuja rostro piloto
+  function drawPilotFace() {
+    const faceCanvas = pilotFaces[pilotState];
+    if (!faceCanvas) return;
+    const ctxFace = pilotFace.getContext('2d') || pilotFace.appendChild(document.createElement('canvas')).getContext('2d');
+    // Clear previous
+    pilotFace.innerHTML = '';
+    pilotFace.appendChild(faceCanvas);
+    faceCanvas.style.width = '64px';
+    faceCanvas.style.height = '64px';
+  }
+
+  // Manejo eventos teclado
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') keys.left = true;
+    if (e.key === 'ArrowRight') keys.right = true;
+    if (e.key === ' ') keys.space = true;
+  });
+  window.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft') keys.left = false;
+    if (e.key === 'ArrowRight') keys.right = false;
+    if (e.key === ' ') keys.space = false;
+  });
+
+  // Loop principal
+  function gameLoop() {
+    // Fondo negro CGA
+    ctx.fillStyle = COLORS.BLACK;
+    ctx.fillRect(0,0,canvas.width, canvas.height);
+
+    // Mover jugador
+    if (keys.left) player.x -= player.speed;
+    if (keys.right) player.x += player.speed;
+    if (player.x < 20) player.x = 20;
+    if (player.x > canvas.width - 20) player.x = canvas.width - 20;
+
+    // Disparar bala
+    if (keys.space) {
+      if (bullets.length === 0 || (bullets[bullets.length-1].y < player.y - 50)) {
+        bullets.push({ x: player.x, y: player.y - 15 });
+        pilotReact('angry');
+      }
+    }
+
+    // Añadir enemigos
+    if (enemies.length < MAX_ENEMIES && Math.random() < 0.03) {
+      enemies.push(createEnemy());
+    }
+
+    // Dibujar todo
+    drawPlayer();
+    drawBullets();
+    updateEnemies();
+    checkCollisions();
+    drawPilotFace();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Inicializar rostro piloto con canvas dentro de div
+  function initPilotFaceCanvas() {
+    const c = document.createElement('canvas');
+    c.width = 16;
+    c.height = 16;
+    c.style.imageRendering = 'pixelated';
+    pilotFace.appendChild(c);
+    return c.getContext('2d');
+  }
+  pilotFace.getContext = initPilotFaceCanvas;
+
+  gameLoop();
+</script>
+
+</body>
+</html>
