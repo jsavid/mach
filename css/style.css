@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+    --bg-color: #111;
+    --screen-bg: #050510;
+    --cga-cyan: #55ffff;
+    --cga-magenta: #ff55ff;
+    --cga-white: #ffffff;
+    --cga-black: #000000;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--cga-white);
+    font-family: 'Press Start 2P', cursive;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* Retro Arcade Cabinet Container */
+#game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
+    background: #000;
+    border: 20px solid #222;
+    border-radius: 10px;
+    box-shadow: 0 0 50px rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    image-rendering: pixelated;
+    background-color: var(--screen-bg);
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* UI Overlay */
+#ui-layer {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
+}
+
+.hud-top {
+    display: flex;
+    justify-content: space-between;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0px #000;
+    color: var(--cga-cyan);
+    font-size: 16px;
+}
+
+#pilot-face-container {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    width: 64px;
+    height: 64px;
+    border: 4px solid var(--cga-white);
+    background: #000;
+}
+
+#pilot-face-container canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* CRT Scanline Effect */
+#scanlines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0),
+        rgba(255, 255, 255, 0) 50%,
+        rgba(0, 0, 0, 0.2) 50%,
+        rgba(0, 0, 0, 0.2)
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0.8;
+}
+
+#vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(
+        circle,
+        rgba(0, 0, 0, 0) 60%,
+        rgba(0, 0, 0, 0.4) 90%,
+        rgba(0, 0, 0, 0.8) 100%
+    );
+    pointer-events: none;
+    z-index: 11;
+}
+
+/* CRT Screen Glow/Bloom */
+#game-container::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: rgba(18, 16, 16, 0.1);
+    opacity: 0;
+    z-index: 2;
+    pointer-events: none;
+    animation: flicker 0.15s infinite;
+}
+
+@keyframes flicker {
+    0% { opacity: 0.02; }
+    50% { opacity: 0.05; }
+    100% { opacity: 0.02; }
+}
